@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>휘매쓰 연산 챌린지!</title>
+
+  <!-- (1) MathJax 설정 스크립트 -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <!-- (2) MathJax 로드 (v3) -->
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+
+  <style>
+    body {
+      margin: 20px auto;
+      max-width: 900px;
+      font-family: sans-serif;
+      background: #f9f9ff;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      color: #444;
+    }
+    .difficulty-select {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .energy-bar {
+      width: 100%;
+      height: 20px;
+      background-color: #ddd;
+      margin: 15px 0;
+      position: relative;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .energy-inner {
+      background-color: #ff5555;
+      height: 100%;
+      width: 100%;
+      transition: width 0.2s linear;
+    }
+    .question-container {
+      margin: 20px 0;
+      border: 1px solid #ccc;
+      padding: 15px;
+      background: #fff;
+      border-radius: 8px;
+    }
+    .answers button {
+      display: inline-block;
+      margin: 5px;
+      padding: 6px 12px;
+      background-color: #eee;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .answers button:hover {
+      background-color: #ddd;
+    }
+    .info-bar {
+      margin: 10px 0;
+      font-weight: bold;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+<h1>휘매쓰 연산 챌린지!</h1>
+
+<!-- 난이도 선택 -->
+<div class="difficulty-select">
+  <p>난이도를 선택하세요:</p>
+  <button onclick="setDifficulty('top')">최상 (20초)</button>
+  <button onclick="setDifficulty('high')">상 (30초)</button>
+  <button onclick="setDifficulty('mid')">중 (40초)</button>
+  <button onclick="setDifficulty('low')">하 (무제한)</button>
+</div>
+
+<!-- 게임 영역 -->
+<div id="game-section" class="hidden">
+  <div class="info-bar">
+    전체 플레이 시간: <span id="totalTime">0</span>초
+    &nbsp;|&nbsp; 남은 기회: <span id="life">3</span>
+    &nbsp;|&nbsp; 현재 점수: <span id="score">0</span>
+  </div>
+
+  <div class="energy-bar">
+    <div class="energy-inner" id="energyBar"></div>
+  </div>
+
+  <div id="question-container" class="question-container">
+    <div id="problem-text"></div>
+    <div class="answers" id="answers"></div>
+  </div>
+</div>
+
+<script>
+// 예시 문제(간략화 버전)
+let allQuestions = [
+  {
+    question: "함수 $y=-3x+2$ 에서 x값이 2 증가할 때 y의 증가량은?",
+    correctAnswer: "$-6$",
+    choices: ["$6$", "$2$", "$-3$"],
+  },
+  {
+    question: "$y=\\frac12 x -6$ 의 x절편, y절편은?",
+    correctAnswer: "x절편 = $12$, y절편 = $-6$",
+    choices: [
+      "x절편 = $0$, y절편 = $-6$",
+      "x절편 = $6$, y절편 = $-12$",
+    ],
+  },
+  // ... (실제로는 전체 문제를 전부 넣어 주세요)
+];
+
+// 전역 변수
+let currentIndex = 0;
+let score = 0;
+let life = 3;
+let totalTime = 0;
+let timeLimit = 999999;
+let pointPerQuestion = 10;
+let energyWidth = 100;
+let energyDecrement = 0;
+
+// 난이도 설정
+function setDifficulty(level){
+  if(level==='top'){
+    timeLimit=20; 
+    pointPerQuestion=20;
+  } else if(level==='high'){
+    timeLimit=30;
+    pointPerQuestion=15;
+  } else if(level==='mid'){
+    timeLimit=40;
+    pointPerQuestion=13;
+  } else {
+    timeLimit=999999; 
+    pointPerQuestion=10;
+  }
+  if(timeLimit<999999){
+    energyDecrement = 100/timeLimit;
+  } else {
+    energyDecrement = 0;
+  }
+
+  document.querySelector('.difficulty-select').classList.add('hidden');
+  document.getElementById('game-section').classList.remove('hidden');
+  startGame();
+}
+
+// 배열 섞기
+function shuffleArray(arr){
+  for(let i = arr.length - 1; i > 0; i--){
+    const r = Math.floor(Math.random()*(i+1));
+    [arr[i], arr[r]] = [arr[r], arr[i]];
+  }
+}
+
+// 게임 시작
+function startGame(){
+  shuffleArray(allQuestions);
+  currentIndex=0;
+  score=0;
+  life=3;
+  totalTime=0;
+  document.getElementById('score').textContent = score;
+  document.getElementById('life').textContent = life;
+  showQuestion();
+
+  setInterval(()=>{
+    totalTime++;
+    document.getElementById('totalTime').textContent = totalTime;
+
+    if(timeLimit < 999999){
+      energyWidth -= energyDecrement;
+      if(energyWidth <= 0){
+        energyWidth=100;
+        life--;
+        document.getElementById('life').textContent = life;
+        if(life<=0) gameOver();
+        else nextQuestion(false);
+      }
+      document.getElementById('energyBar').style.width = energyWidth + "%";
+    }
+  },1000);
+}
+
+// 문제 표시
+function showQuestion(){
+  if(currentIndex >= allQuestions.length){
+    currentIndex=0;
+    shuffleArray(allQuestions);
+  }
+  const q = allQuestions[currentIndex];
+
+  document.getElementById('problem-text').innerHTML = q.question;
+
+  // 정답+오답 보기 섞기
+  let answers = [q.correctAnswer, ...q.choices];
+  shuffleArray(answers);
+
+  const answersDiv = document.getElementById('answers');
+  answersDiv.innerHTML='';
+  answers.forEach(ans=>{
+    let btn = document.createElement('button');
+    btn.innerHTML = ans;
+    btn.onclick = ()=>checkAnswer(ans);
+    answersDiv.appendChild(btn);
+  });
+
+  // *** 여기! 동적 HTML에 수식이 생겼으니, MathJax에 다시 렌더링 요청 ***
+  MathJax.typeset();  
+}
+
+// 정답 체크
+function checkAnswer(selected){
+  const q=allQuestions[currentIndex];
+  if(selected === q.correctAnswer){
+    score += pointPerQuestion;
+    document.getElementById('score').textContent=score;
+    nextQuestion(true);
+  } else {
+    alert("틀렸습니다! 정답: " + q.correctAnswer);
+    life--;
+    document.getElementById('life').textContent=life;
+    if(life<=0) gameOver();
+    else nextQuestion(false);
+  }
+}
+
+// 다음 문제
+function nextQuestion(isCorrect){
+  energyWidth=100;
+  document.getElementById('energyBar').style.width="100%";
+  currentIndex++;
+  showQuestion();
+}
+
+// 게임 종료
+function gameOver(){
+  alert("게임 종료! 최종 점수: "+score);
+  location.reload();
+}
+</script>
+</body>
+</html>
